@@ -1,4 +1,4 @@
-![NPeg](/doc/npeg.png)
+![NPeg](/doc/npeg.png#6)
 
 NPeg is a pure Nim pattern matching library. It provides macros to compile
 patterns and grammars (PEGs) to Nim procedures which will parse a string and
