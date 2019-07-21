@@ -14,14 +14,14 @@ type
     rp: int
     cp: int
 
-  MatchResult* = object
+  MatchResult*[T] = object
     ok*: bool
     matchLen*: int
     matchMax*: int
-    cs*: Captures
+    cs*: Captures[T]
 
-  Parser* = object
-    fn*: proc(s: string): MatchResult
+  Parser*[T] = object
+    fn*: proc(s: string): MatchResult[T]
 
 
 # This macro translates `$1`.. into `capture[0]`.. for use in code block captures
@@ -46,11 +46,11 @@ proc mkDollarCaptures(n: NimNode): NimNode =
 # names from getting mangled so that the code in the `peg` macro can access it.
 # I'd love to hear if there are better solutions for this.
 
-template skel(cases: untyped, ip: NimNode, capture: NimNode) =
+template skel(T: untyped, cases: untyped, ip: NimNode, capture: NimNode) =
 
   {.push hint[XDeclaredButNotUsed]: off.}
 
-  let match = proc(s: string): MatchResult =
+  let match = proc(s: string): MatchResult[T] =
 
     # The parser state
 
@@ -60,7 +60,7 @@ template skel(cases: untyped, ip: NimNode, capture: NimNode) =
       simax: int
       refs = initTable[string, string]()
       retStack = initStack[RetFrame]("return", 8, npegRetStackSize)
-      capStack = initStack[CapFrame]("capture", 8)
+      capStack = initStack[CapFrame[T]]("capture", 8)
       backStack = initStack[BackFrame]("backtrace", 8, npegBackStackSize)
 
     # Debug trace. Slow and expensive
@@ -150,21 +150,27 @@ template skel(cases: untyped, ip: NimNode, capture: NimNode) =
 
     template opCapOpenFn(n: int, capname: string, iname="") =
       let ck = CapKind(n)
+      var val: T
       trace iname, "capopen " & $ck & " -> " & $si
-      push(capStack, (cft: cftOpen, si: si, ck: ck, name: capname))
+      push(capStack, (cft: cftOpen, si: si, ck: ck, name: capname, val: val))
       inc ip
     
     template opCapCloseFn(n: int, actionCode: untyped, iname="") =
       let ck = CapKind(n)
       trace iname, "capclose " & $ck & " -> " & $si
-      push(capStack, (cft: cftClose, si: si, ck: ck, name: ""))
+      var val: T
+      push(capStack, (cft: cftClose, si: si, ck: ck, name: "", val: val))
       if ck == ckAction:
-        let cs = fixCaptures(s, capStack, FixOpen)
+        let cs = fixCaptures[T](s, capStack, FixOpen)
         let capture {.inject.} = collectCaptures(cs)
-        block:
+        proc doBlock(): T =
           actionCode
+        let val = doBlock()
+        push(capStack, (cft: cftOpen, si: 0, ck: ckValue, name: "", val: val))
+        push(capStack, (cft: cftClose, si: 0, ck: ckValue, name: "", val: val))
+        
       elif ck == ckRef:
-        let cs = fixCaptures(s, capStack, FixOpen)
+        let cs = fixCaptures[T](s, capStack, FixOpen)
         let r = collectCapturesRef(cs)
         refs[r.key] = r.val
       inc ip
@@ -223,11 +229,11 @@ template skel(cases: untyped, ip: NimNode, capture: NimNode) =
     result.matchLen = si
     result.matchMax = simax
     if result.ok and capStack.top > 0:
-      result.cs = fixCaptures(s, capStack, FixAll)
+      result.cs = fixCaptures[T](s, capStack, FixAll)
 
   {.pop.}
 
-  Parser(fn: match)
+  Parser[T](fn: match)
 
 
 # Convert the list of parser instructions into a Nim finite state machine
@@ -280,7 +286,7 @@ proc genCode*(patt: Patt): NimNode =
     cases.add nnkOfBranch.newTree(newLit(n), call)
 
   cases.add nnkElse.newTree(parseStmt("opFailFn()"))
-  result = getAst skel(cases, ipNode, ident "capture")
+  result = getAst skel(int, cases, ipNode, ident "capture")
 
   when false:
     echo result.repr

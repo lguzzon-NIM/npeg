@@ -56,7 +56,7 @@ macro patt*(n: untyped): untyped =
   grammar.link("anonymous").genCode()
 
 
-proc match*(p: Parser, s: string): MatchResult =
+proc match*[T](p: Parser[T], s: string): MatchResult[T] =
   p.fn(s)
 
 

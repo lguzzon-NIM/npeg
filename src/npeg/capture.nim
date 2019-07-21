@@ -6,14 +6,15 @@ import npeg/[stack,common]
 
 type
 
-  Capture* = object
+  Capture*[T] = object
     ck: CapKind
     si*: int
     s*: string
     name: string
     len: int
+    val*: T
 
-  Captures* = seq[Capture]
+  Captures*[T] = seq[Capture[T]]
 
   FixMethod* = enum
     FixAll, FixOpen
@@ -22,7 +23,7 @@ type
 # Convert all closed CapFrames on the capture stack to a list of Captures, all
 # consumed frames are removed from the CapStack
 
-proc fixCaptures*(s: string, capStack: var Stack[CapFrame], fm: FixMethod): Captures =
+proc fixCaptures*[T](s: string, capStack: var Stack[CapFrame[T]], fm: FixMethod): Captures[T] =
 
   assert capStack.top > 0
   assert capStack.peek.cft == cftCLose
@@ -47,12 +48,13 @@ proc fixCaptures*(s: string, capStack: var Stack[CapFrame], fm: FixMethod): Capt
     let c = capStack[i]
     if c.cft == cftOpen:
       stack.push result.len
-      result.add Capture(ck: c.ck, si: c.si, name: c.name)
+      result.add Capture[T](ck: c.ck, si: c.si, name: c.name)
     else:
       let i2 = stack.pop()
       assert result[i2].ck == c.ck
       result[i2].s = s[result[i2].si..<c.si]
       result[i2].len = result.len - i2 - 1
+      result[i2].val = c.val
   assert stack.top == 0
 
   # Remove closed captures from the cap stack
@@ -61,7 +63,7 @@ proc fixCaptures*(s: string, capStack: var Stack[CapFrame], fm: FixMethod): Capt
 
 
 proc collectCaptures*(caps: Captures): Captures =
-  result = caps.filterIt(it.ck == ckStr)
+  result = caps.filterIt(it.ck == ckStr or it.ck == ckValue)
 
 
 proc collectCapturesRef*(caps: Captures): Ref =

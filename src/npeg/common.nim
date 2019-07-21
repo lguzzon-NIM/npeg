@@ -31,12 +31,14 @@ type
     ckAction,       # Action capture, executes Nim code at match time
     ckRef           # Reference
     ckClose,        # Closes capture
+    ckValue,        # Return value
 
-  CapFrame* = tuple
+  CapFrame*[T] = tuple
     cft: CapFrameType
     si: int
     ck: CapKind
     name: string
+    val: T
 
   Ref* = object
     key*: string
