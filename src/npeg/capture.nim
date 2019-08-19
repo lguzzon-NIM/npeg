@@ -1,5 +1,4 @@
 
-import json
 import strutils
 import sequtils
 import npeg/[stack,common]
@@ -26,7 +25,7 @@ type
   ASTNode* = ref object
     id*: string
     val*: string
-    kids*: seq[ASTNode]
+    kids*: seq[owned ASTNode]
 
 # Convert all closed CapFrames on the capture stack to a list of Captures, all
 # consumed frames are removed from the CapStack
@@ -81,56 +80,58 @@ proc collectCapturesRef*(caps: Captures): Ref =
     result.val = cap.s
 
 
-proc collectCapturesJson*(cs: Captures): JsonNode =
+when not defined(nimv2):
+  import json
+  proc collectCapturesJson*(cs: Captures): JsonNode =
 
-  proc aux(iStart, iEnd: int, parentNode: JsonNode): JsonNode =
+    proc aux(iStart, iEnd: int, parentNode: JsonNode): JsonNode =
 
-    var i = iStart
-    while i <= iEnd:
-      let cap = cs[i]
+      var i = iStart
+      while i <= iEnd:
+        let cap = cs[i]
 
-      case cap.ck:
-        of ckJString: result = newJString cap.s
-        of ckJBool:
-          case cap.s:
-            of "true": result = newJBool true
-            of "false": result = newJBool false
-            else: raise newException(NPegException, "Error parsing Json bool")
-        of ckJInt: result = newJInt parseInt(cap.s)
-        of ckJFloat: result = newJFloat parseFloat(cap.s)
-        of ckJArray: result = newJArray()
-        of ckJFieldDynamic: result = newJArray()
-        of ckJObject: result = newJObject()
-        of ckStr, ckJFieldFixed, ckAction, ckClose, ckRef, ckAST: discard
-      
-      let nextParentNode = 
-        if result != nil and result.kind in { JArray, JObject }: result
-        else: parentNode
+        case cap.ck:
+          of ckJString: result = newJString cap.s
+          of ckJBool:
+            case cap.s:
+              of "true": result = newJBool true
+              of "false": result = newJBool false
+              else: raise newException(NPegException, "Error parsing Json bool")
+          of ckJInt: result = newJInt parseInt(cap.s)
+          of ckJFloat: result = newJFloat parseFloat(cap.s)
+          of ckJArray: result = newJArray()
+          of ckJFieldDynamic: result = newJArray()
+          of ckJObject: result = newJObject()
+          of ckStr, ckJFieldFixed, ckAction, ckClose, ckRef, ckAST: discard
 
-      if parentNode != nil and parentNode.kind == JArray:
-        parentNode.add result
+        let nextParentNode =
+          if result != nil and result.kind in { JArray, JObject }: result
+          else: parentNode
 
-      inc i
-      let childNode = aux(i, i+cap.len-1, nextParentNode)
+        if parentNode != nil and parentNode.kind == JArray:
+          parentNode.add result
 
-      if parentNode != nil and parentNode.kind == JObject:
-        if cap.ck == ckJFieldFixed:
-          parentNode[cap.name] = childNode
-        if cap.ck == ckJFieldDynamic:
-          let tag = result[0].getStr()
-          parentNode[tag] = result[1]
-          result = nil
+        inc i
+        let childNode = aux(i, i+cap.len-1, nextParentNode)
 
-      i += cap.len 
+        if parentNode != nil and parentNode.kind == JObject:
+          if cap.ck == ckJFieldFixed:
+            parentNode[cap.name] = childNode
+          if cap.ck == ckJFieldDynamic:
+            let tag = result[0].getStr()
+            parentNode[tag] = result[1]
+            result = nil
 
-  result = aux(0, cs.len-1, nil)
-  if result == nil:
-    result = newJNull()
+        i += cap.len
+
+    result = aux(0, cs.len-1, nil)
+    if result == nil:
+      result = newJNull()
 
 
-proc collectCapturesAST*(cs: Captures): ASTNode =
+proc collectCapturesAST*(cs: Captures): owned ASTNode =
 
-  proc aux(iStart, iEnd: int, parent: ASTNode, d: int=0): ASTnode =
+  proc aux(iStart, iEnd: int, parent: ASTNode, d: int=0): owned ASTnode =
 
     var i = iStart
     while i <= iEnd:

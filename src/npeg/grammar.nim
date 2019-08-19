@@ -66,7 +66,7 @@ proc link*(grammar: Grammar, initial_name: string, dot: Dot = nil): Patt =
     result.dump(symTab)
 
 
-proc newGrammar*(): Grammar =
+proc newGrammar*(): owned Grammar =
   result = newTable[string, Patt]()
 
 

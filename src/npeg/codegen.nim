@@ -157,7 +157,7 @@ template skel(T: untyped, cases: untyped, ip: NimNode, userdata: NimNode, captur
       trace iname, s, "capopen " & $ck & " -> " & $si
       push(capStack, (cft: cftOpen, si: si, ck: ck, name: capname))
       inc ip
-    
+
     template opCapCloseFn(n: int, actionCode: untyped, iname="") {.dirty.} =
       # This template is dirty to avoid name mangling
       let ck = CapKind(n)
@@ -174,12 +174,12 @@ template skel(T: untyped, cases: untyped, ip: NimNode, userdata: NimNode, captur
         else:
           ip = -1
       elif ck == ckRef:
-        let r = collectCapturesRef(fixCaptures(s, capStack, FixOpen))
-        refs[r.key] = r.val
+        let cs = collectCapturesRef(fixCaptures(s, capStack, FixOpen))
+        refs[cs.key] = cs.val
         inc ip
       else:
         inc ip
-    
+
     template opBackrefFn(refName: string, iname="") =
       # This is a proc because we do not want to export 'contains'
       if refName in refs:

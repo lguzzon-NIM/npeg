@@ -32,7 +32,6 @@
 
 import tables
 import macros
-import json
 import strutils
 import npeg/[common,codegen,capture,parsepatt,grammar,dot,lib]
 
@@ -84,7 +83,7 @@ proc match*(p: Parser, s: Subject): MatchResult =
 
 # Match a file
 
-when defined(windows) or defined(posix):
+when defined(windows) or defined(posix) and not defined(nimV2):
   import memfiles
   proc matchFile*[T](p: Parser, fname: string, userdata: var T): MatchResult =
     var m = memfiles.open(fname)
@@ -105,13 +104,15 @@ proc captures*(mr: MatchResult): seq[string] =
 
 # Return a tree with Json captures from the match result
 
-proc capturesJson*(mr: MatchResult): JsonNode =
-  collectCapturesJson(mr.cs)
+when not defined(nimV2):
+  import json
+  proc capturesJson*(mr: MatchResult): JsonNode =
+    collectCapturesJson(mr.cs)
 
 
 # Return a tree with AST captures from the match result
 
-proc capturesAST*(mr: MatchResult): ASTNode =
+proc capturesAST*(mr: MatchResult): owned ASTNode =
   collectCapturesAST(mr.cs)
 
 proc `$`*(a: ASTNode): string =

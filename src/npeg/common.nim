@@ -140,24 +140,24 @@ type
 
   Symtab* = TwoWayTable[string, int]
 
-proc newTwoWayTable*[X,Y](): TwoWayTable[X,Y] =
+proc newTwoWayTable*[X,Y](): owned TwoWayTable[X,Y] =
   new result
   result.x2y = initTable[X, Y]()
   result.y2x = initTable[Y, X]()
 
-proc add*[X,Y](s: TwoWayTable[X,Y], x: X, y: Y) =
+proc add*[X,Y](s: owned TwoWayTable[X,Y], x: X, y: Y) =
   s.x2y[x] = y
   s.y2x[y] = x
 
-proc contains*[X,Y](s: TwoWayTable[X,Y], y: Y): bool =
+proc contains*[X,Y](s: owned TwoWayTable[X,Y], y: Y): bool =
   return y in s.y2x
 
-proc contains*[X,Y](s: TwoWayTable[X,Y], x: X): bool =
+proc contains*[X,Y](s: owned TwoWayTable[X,Y], x: X): bool =
   return x in s.x2y
 
-proc get*[X,Y](s: TwoWayTable[X,Y], y: Y): X =
+proc get*[X,Y](s: owned TwoWayTable[X,Y], y: Y): X =
   return s.y2x[y]
 
-proc get*[X,Y](s: TwoWayTable[X,Y], x: X): Y =
+proc get*[X,Y](s: owned TwoWayTable[X,Y], x: X): Y =
   return s.x2y[x]
 

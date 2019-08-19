@@ -17,7 +17,7 @@ const colors = {
 proc escape(s: string): string =
   return s.replace(".", "_").replace("-", "_")
 
-proc newDot*(name: string): Dot =
+proc newDot*(name: string): owned Dot =
   return Dot(name: name, edges: initTable[string, bool]())
 
 proc add*(d: Dot, n1, n2: string, meth: string) =
