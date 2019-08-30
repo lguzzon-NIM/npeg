@@ -6,6 +6,16 @@ This document contains a random collection of snippets and fragments which
 might serve as inspiration when developing your parsers.
 
 
+## Find the port number for the http service
+
+This little pattern searches for the `http` service line in `/etc/services`
+and captures the port number.
+
+```
+let p = patt: @("http" * +Space * >+Digit)
+echo p.matchFile("/etc/services").captures
+```
+
 ## Comma separated list
 
 Below is a common parser that matches a list of one or more elements
