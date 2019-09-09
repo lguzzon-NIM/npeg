@@ -181,7 +181,7 @@ proc parsePatt*(name: string, nn: NimNode, grammar: Grammar, dot: Dot = nil): Pa
 
   when npegGraph:
     let rr = parseRailroad(nn, grammar)
-    echo $(rr.wrap(name)) & "\n"
+    dump(rr.wrap(name))
 
   result = aux(nn)
   dot.addPatt(name, result.len)

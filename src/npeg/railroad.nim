@@ -1,13 +1,17 @@
 
-import macros, unicode, strutils, tables
+import macros, unicode, strutils, tables, terminal
 import npeg/[patt,grammar,common]
 
 
 type
 
+  Char = object
+    r: Rune
+    fg: ForeGroundColor
+
   Sym = object
     x, y: int
-    r: Rune
+    c: Char
 
   Node = ref object
     w, y0, y1: int
@@ -22,15 +26,21 @@ type
 # Renders a node to text output
 #
 
-proc `$`*(n: Node): string =
+proc dump*(n: Node) =
   if n == nil:
-    return ""
+    return
+
+  type
+    Line = seq[Char]
+    Grid = seq[Line]
+
   let h = n.y1 - n.y0 + 1
   let y0 = n.y0
-  var l: seq[Rune]
-  var ls: seq[seq[Rune]]
-  for x in 0..<n.w: l.add ' '.Rune
-  for y in 0..<h: ls.add l
+  var line: Line
+  for x in 0..<n.w: line.add Char(r: ' '.Rune)
+
+  var lines: Grid
+  for y in 0..<h: lines.add line
                
   proc render(n: Node, x, y: int) =
     for k in n.kids:
@@ -38,16 +48,27 @@ proc `$`*(n: Node): string =
     for s in n.syms:
       let sx = x+s.x
       let sy = y+s.y - y0
-      ls[sy][sx] = s.r
+      lines[sy][sx] = s.c
   render(n, 0, 0)
-  result = ls.join("\n")
+
+  for line in lines:
+    var o: string
+    var fg = fgDefault
+    for cell in line:
+      if fg != cell.fg:
+        fg = cell.fg
+        o.add ansiForegroundColorCode(fg)
+      o.add $cell.r
+    o.add ansiForegroundColorCode(fgDefault)
+    echo o
+  echo ""
 
 
-proc poke(n: Node, x, y: int, r: Rune) =
-  n.syms.add Sym(x: x, y: y, r: r)
+proc poke(n: Node, x, y: int, r: Rune, fg: ForegroundColor = fgDefault) =
+  n.syms.add Sym(x: x, y: y, c: Char(r: r, fg: fg))
 
-proc poke(n: Node, x, y: int, s: string) =
-  n.poke(x, y, s.runeAt(0))
+proc poke(n: Node, x, y: int, s: string, fg: ForegroundColor = fgDefault) =
+  n.poke(x, y, s.runeAt(0), fg)
 
 proc pad(n: Node, left, right: int): Node = 
   result = Node(w: n.w + left + right, y0: n.y0, y1: n.y1)
@@ -72,11 +93,11 @@ proc wrap*(n: Node, name: string): Node =
 proc newNode(): Node =
   result = Node()
 
-proc newNode(s: string): Node =
+proc newNode(s: string, fg: ForegroundColor = fgDefault): Node =
   let rs = s.toRunes()
   let n = Node(w: rs.len)
   for x in 0..<rs.len:
-    n.poke(x, 0, rs[x])
+    n.poke(x, 0, rs[x], fg)
   result = n.pad(1, 1)
 
 proc newNode(n: Node, ck: CapKind, s: string=""): Node =
@@ -87,17 +108,17 @@ proc newCapNode(n: Node): Node =
   result.y0 = n.y0 - 1
   result.y1 = n.y1 + 1
   let (x0, x1, y0, y1) = (1, result.w-2, result.y0, result.y1)
-  result.poke(x0, y0, "╭")
-  result.poke(x1, y0, "╮")
-  result.poke(x0, y1, "╰")
-  result.poke(x1, y1, "╯")
+  result.poke(x0, y0, "╭", fgBlue)
+  result.poke(x1, y0, "╮", fgBlue)
+  result.poke(x0, y1, "╰", fgBlue)
+  result.poke(x1, y1, "╯", fgBlue)
   for x in x0+1..x1-1:
-    result.poke(x, y0, "╶")
-    result.poke(x, y1, "╶")
+    result.poke(x, y0, "╶", fgBlue)
+    result.poke(x, y1, "╶", fgBlue)
   for y in y0+1..y1-1:
     if y != 0:
-      result.poke(x0, y, "┆")
-      result.poke(x1, y, "┆")
+      result.poke(x0, y, "┆", fgBlue)
+      result.poke(x1, y, "┆", fgBlue)
 
 proc `*`(n1, n2: Node): Node =
   result = Node(w: n1.w + n2.w, y0: min(n1.y0, n2.y0), y1: max(n1.y1, n2.y1))
@@ -240,13 +261,13 @@ proc parseRailRoad*(nn: NimNode, grammar: Grammar): Node =
           result = newNode(aux n[0], ckAction)
 
       of nnkIntLit:
-        result = newNode($n.intVal)
+        result = newNode($n.intVal, fgWhite)
 
       of nnkStrLit:
-        result = newNode("\"" & $n.strval.dumpString() & "\"")
+        result = newNode("\"" & $n.strval.dumpString() & "\"", fgWhite)
 
       of nnkCharLit:
-        result = newNode("'" & $n.intVal.char & "'")
+        result = newNode("'" & $n.intVal.char & "'", fgWhite)
 
       of nnkCall:
         var name: string
@@ -295,10 +316,10 @@ proc parseRailRoad*(nn: NimNode, grammar: Grammar): Node =
         else: discard
 
       of nnkIdent:
-        result = newNode("[" & n.strVal & "]")
+        result = newNode("[" & n.strVal & "]", fgCyan)
 
       of nnkDotExpr:
-        result = newNode("[" & n[0].strVal & "." & n[1].strVal & "]")
+        result = newNode("[" & n[0].strVal & "." & n[1].strVal & "]", fgCyan)
 
       of nnkCurly:
         var cs: CharSet
@@ -310,9 +331,9 @@ proc parseRailRoad*(nn: NimNode, grammar: Grammar): Node =
               for c in nc[1].intVal..nc[2].intVal:
                 cs.incl c.char
         if cs.card == 0:
-          result = newNode("1")
+          result = newNode("1", fgCyan)
         else:
-          result = newNode(dumpSet(cs))
+          result = newNode(dumpSet(cs), fgWhite)
 
       of nnkCallStrLit:
         case n[0].strVal:
