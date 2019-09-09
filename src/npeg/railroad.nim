@@ -82,6 +82,23 @@ proc newNode(s: string): Node =
 proc newNode(n: Node, ck: CapKind, s: string=""): Node =
   return n
 
+proc newCapNode(n: Node): Node =
+  result = pad(n, 2, 2)
+  result.y0 = n.y0 - 1
+  result.y1 = n.y1 + 1
+  let (x0, x1, y0, y1) = (1, result.w-2, result.y0, result.y1)
+  result.poke(x0, y0, "╭")
+  result.poke(x1, y0, "╮")
+  result.poke(x0, y1, "╰")
+  result.poke(x1, y1, "╯")
+  for x in x0+1..x1-1:
+    result.poke(x, y0, "╶")
+    result.poke(x, y1, "╶")
+  for y in y0+1..y1-1:
+    if y != 0:
+      result.poke(x0, y, "┆")
+      result.poke(x1, y, "┆")
+
 proc `*`(n1, n2: Node): Node =
   result = Node(w: n1.w + n2.w, y0: min(n1.y0, n2.y0), y1: max(n1.y1, n2.y1))
   result.kids.add Kid(n: n1, dx: 0)
@@ -245,7 +262,7 @@ proc parseRailRoad*(nn: NimNode, grammar: Grammar): Node =
           for i in 1..<n.len: cs.add aux(n[i])
           result = choice(cs)
         else:
-          result = aux(n[1])
+          result = newCapNode aux(n[1])
 
       of nnkPrefix:
         # Nim combines all prefix chars into one string. Handle prefixes
@@ -258,6 +275,7 @@ proc parseRailRoad*(nn: NimNode, grammar: Grammar): Node =
             of '+': p = +p
             of '*': p = *p
             of '!': p = newNode()
+            of '>': p = newCapNode(p)
             else: p = p
         result = p
 
